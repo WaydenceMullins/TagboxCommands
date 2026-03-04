@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Tagbox Commands
 // @namespace    http://tampermonkey.net/
-// @version      2026-02-11
+// @version      0.1
 // @description  Alias and remove commands for e621
 // @author       Waydence
 // @icon         https://cdn.jsdelivr.net/gh/WaydenceMullins/TagboxCommands@main/icon64.png
@@ -39,10 +39,9 @@ const defaultTcConfig = {
 };
 
 function ParseAliases(string){
-  console.log("parsed aliases");
   return string.replace(/\s*;\s*|\n\n/g,"\n") // ; to newline, multiple newlines to single
-    .replace(/(?<=^|\n) *#+.*\n|\n *#+.*$| *#+.*|(?<=^|\n)\s+| +(?=->|>|=|,)|(?<=>|=|,) +|\s*(?=\n|$)/g,"") // remove comments, spaces (before each definition, before and after arrows, after each definition)
-    .replace(/(?<!(>|=).+)\n| +/g," ") // newlines in multiline rules and multi-spaces to a single space
+    .replace(/(?<=^|\n)\s*#+.*\n|\n\s*#+.*$|\s*#+.*|(?<=^|\n)\s+|\s+(?=->|>|=|,)|(?<=>|=|,)\s+|\s*(?=\n|$)/g,"") // remove comments, spaces (before each definition, before and after arrows, after each definition)
+    .replace(/(?<!(>|=).+)\n|  /g," ") // newlines in multiline rules and multi-spaces to a single space
     .replace(/(?<= |>)-(?!>)/g,tcConfig.rmChr) // - to rm character
     .split("\n")
     .map(rule=>{ return {"antcd": RegExp.escape(rule.split(/->|>/)[0]).replace(re_wildcard,"(\\S+)").split("\\x20"), "consq": rule.split(/->|>/)[1], "partial": !/->/.test(rule)}; });
@@ -51,7 +50,6 @@ function ParseAliases(string){
 function ResetConfig(){
   GM_setValue("tcConfig", defaultTcConfig);
   tcConfig = GM_getValue("tcConfig", null);
-  console.log("config reset");
 }
 
 let invChrEsc,addChrEsc,rmChrEsc,normChrEsc,re_wildcard,sortChrEsc,sortgroupChrEsc,re_sorteither,re_findRmChr,re_findNoRmChr,re_invRmChr,fn_invRmChr,cmdCaptGroups,re_findGroupToSort,re_tagsWithRmCmd
@@ -65,7 +63,7 @@ function RefreshConfig(){
 
   sortChrEsc = RegExp.escape(tcConfig.sortChr);
   sortgroupChrEsc = RegExp.escape(tcConfig.sortgroupChr);
-  re_sorteither = new RegExp(`(?<!\S)(${sortChrEsc}|${sortgroupChrEsc})(?!\S)`,"g");
+  re_sorteither = new RegExp(`(?<!\S)(${sortgroupChrEsc}|${sortChrEsc})(?!\S)`,"g");
 
   re_findRmChr = new RegExp(`(?<=^| )${rmChrEsc}`,"g");
 
@@ -80,7 +78,11 @@ function RefreshConfig(){
 
   re_tagsWithRmCmd = new RegExp(`(?<=(?<!\\S)${rmChrEsc})\\S+`,"g");
 
-  allAliasRules = ParseAliases(tcConfig.savedAliases);
+  allAliasRules = [];
+
+  if (/\S+ *> *\S+/.test(tcConfig.savedAliases)){
+    allAliasRules = ParseAliases(tcConfig.savedAliases);
+  }
 
   if (/\*al\*[\s\S]+>[\s\S]+\*al\*/.test(decodeURI(currentSite.search))){
     allAliasRules = allAliasRules.concat(ParseAliases(decodeURI(currentSite.search).split("*al*")[1]));
@@ -110,7 +112,7 @@ function RefreshConfig(){
       request.send();
     }
   }
-  console.log("config refreshed");
+  allAliasRules.reverse();
 }
 
 function SliceByCaret(element){return [element.value.slice(0, element.selectionStart), element.value.slice(element.selectionStart)];} // to keep track of text cursor position
@@ -121,7 +123,6 @@ function PokeTagBox(element){ // send events to trigger updates of tag preview a
   currentlyPoking = true;
   ["keyup","input"].forEach(event=>element.dispatchEvent(new Event(event)));
   currentlyPoking = false;
-  console.log("poked tagbox");
 }
 
 function GetCombinedTagString(){return Array.from(tagTextareas).map(tagTextarea=>tagTextarea.value).join(" ");} // splice all tag boxes together
@@ -135,7 +136,6 @@ function RemoveFoundTags(tagsToRm){
     tagTextarea.selectionStart = tagTextarea.selectionEnd = tagStringHalves[0].length;
     PokeTagBox(tagTextarea);
   });
-  console.log("removed found tags");
 }
 
 function RemoveTags(){
@@ -186,65 +186,63 @@ function RemoveTags(){
     }
   }
   request.send(`tags=${tagsToRm.join("+")}+${GetCombinedTagString().replace(/\s+/g,"+")}`);
-  console.log("removed tags");
 }
 
 function ReplaceSortTags(event){
   if (event.key === tcConfig.keybind || tcConfig.runOnEvent === "input"){
-    let tagStringHalves = SliceByCaret(this);
+    if (allAliasRules.length > 0){
+      let tagStringHalves = SliceByCaret(this);
 
-    allAliasRules.forEach(rule=>{
+      allAliasRules.forEach(rule=>{
 
-      let re_antcdJoined = new RegExp(`${rule.antcd.join("|")}`, "g");
+        let antcdJoined = rule.antcd.join("|");
 
-      tagStringHalves = tagStringHalves.map(half=>{
+        tagStringHalves = tagStringHalves.map(half=>{
 
-        // find tag to replace, put it into <tag> capturing group, and its command into corresponding <inv>,<add>,<rm> or <norm> group
-        return half.replace(new RegExp(`(?<!\\S)${cmdCaptGroups}(?<tag>${re_antcdJoined.source})${rule.partial?"\\s*$":"(?!\\S)"}`,"g"), (...parameteres)=>{
+          // find tag to replace, put it into <tag> capturing group, and its command into corresponding <inv>,<add>,<rm> or <norm> group
+          return half.replace(new RegExp(`(?<!\\S)${cmdCaptGroups}(?<tag>${antcdJoined})${rule.partial?"\\s*$":"(?!\\S)"}`,"g"), (...parameteres)=>{
 
-          let match = parameteres[parameteres.length - 1]; // last parameter is an object with capture group names as keys and matches as values
+            let match = parameteres[parameteres.length - 1]; // last parameter is an object with capture group names as keys and matches as values
 
-          match.tag = match.tag.replace(re_antcdJoined, rule.consq); // perform substitution
+            match.tag = match.tag.replace(new RegExp(`^(${antcdJoined})$`, "g"), rule.consq); // perform substitution
 
-          // execute a command if it is found
-          if (match.inv){ match.tag = match.tag.replace(re_invRmChr, fn_invRmChr); }
-          if (match.add){ match.tag = match.tag.replace(re_findRmChr, ""); }
-          if (match.rm){ match.tag = match.tag.replace(re_findNoRmChr, tcConfig.rmChr); }
+            // execute a command if it is found
+            if (match.inv){ match.tag = match.tag.replace(re_invRmChr, fn_invRmChr); }
+            if (match.add){ match.tag = match.tag.replace(re_findRmChr, ""); }
+            if (match.rm){ match.tag = match.tag.replace(re_findNoRmChr, tcConfig.rmChr); }
 
-          return match.tag;
+            return match.tag;
+          });
         });
       });
-    });
 
-    let caretPosition = tagStringHalves[0].length;
+      let caretPosition = tagStringHalves[0].length;
 
-    let tagString = tagStringHalves.join("").replace(re_findGroupToSort, (group,sortGroupCmdFound,offset)=>{
+      let tagString = tagStringHalves.join("").replace(re_findGroupToSort, (group,sortGroupCmdFound,offset)=>{
 
-      group = group.replace(re_sorteither,"").split(" ").sort()
-        .map((tag,index,array)=>{return sortGroupCmdFound && index!=0 && tag[0]!=array[index-1][0] ? "\n"+tag : tag;})
-        .join(" ").trim();
+        group = group.replace(re_sorteither,"").split(" ").sort()
+          .map((tag,index,array)=>{return sortGroupCmdFound && index!=0 && tag[0]!=array[index-1][0] ? "\n"+tag : tag;})
+          .join(" ").trim();
 
-      caretPosition = group.length + offset; // move text cursor to the end of sorted group
+        caretPosition = group.length + offset; // move text cursor to the end of sorted group
 
-      return group;
-    });
+        return group;
+      });
 
-    this.value = tagString;
+      this.value = tagString;
 
-    this.selectionStart = this.selectionEnd = caretPosition;
+      this.selectionStart = this.selectionEnd = caretPosition;
 
-    PokeTagBox(this);
-
+      PokeTagBox(this);
+    }
     RemoveTags() // now process remove
   }
 
   event.key === "Enter" || event.key === "Tab" && RemoveTags(); // call remove on autocomplete keys
-  console.log("replaced/sorted tags");
 }
 
 const RefreshTagboxElements = function(event){
   if (event.animationName === "tagFieldAdded"){
-    console.log("refreshed tagbox elements");
 
     // all fields with autocomplete get processed for sort, replace, and remove on keybind
     document.querySelectorAll("[data-autocomplete^='tag']").forEach(field=>{
@@ -277,24 +275,22 @@ function OpenSettingsDialog(){
   tcConfig.runOnEvent==="input" ? settingsDialog.TCS_runOnEvent.checked=true : settingsDialog.TCS_runOnEvent.checked=false;
   tcConfig.cssAliasesEnabled ? settingsDialog.TCS_cssAliasesEnabled.checked=true : settingsDialog.TCS_cssAliasesEnabled.checked=false;
   settingsDialog.TCS_savedAliases.value = tcConfig.savedAliases;
-  console.log("opened settings dialog");
 }
 
 function SaveSettings(){
   settingsDialog.TCS_keybind.innerText==="Space" ? tcConfig.keybind=" " : tcConfig.keybind=settingsDialog.TCS_keybind.innerText;
-  tcConfig.invChr = settingsDialog.TCS_invChr.value;
-  tcConfig.addChr = settingsDialog.TCS_addChr.value;
-  tcConfig.rmChr = settingsDialog.TCS_rmChr.value;
-  tcConfig.normChr = settingsDialog.TCS_normChr.value;
-  tcConfig.sortChr = settingsDialog.TCS_sortChr.value;
-  tcConfig.sortgroupChr = settingsDialog.TCS_sortgroupChr.value;
-  tcConfig.wildcardChr = settingsDialog.TCS_wildcardChr.value;
+  settingsDialog.TCS_invChr.value==="" ? tcConfig.invChr=defaultTcConfig.invChr : tcConfig.invChr=settingsDialog.TCS_invChr.value;
+  settingsDialog.TCS_addChr.value==="" ? tcConfig.addChr=defaultTcConfig.addChr : tcConfig.addChr=settingsDialog.TCS_addChr.value;
+  settingsDialog.TCS_rmChr.value==="" ? tcConfig.rmChr=defaultTcConfig.rmChr : tcConfig.rmChr=settingsDialog.TCS_rmChr.value;
+  settingsDialog.TCS_normChr.value==="" ? tcConfig.normChr=defaultTcConfig.normChr : tcConfig.normChr=settingsDialog.TCS_normChr.value;
+  settingsDialog.TCS_sortChr.value==="" ? tcConfig.sortChr=defaultTcConfig.sortChr : tcConfig.sortChr=settingsDialog.TCS_sortChr.value;
+  settingsDialog.TCS_sortgroupChr.value==="" ? tcConfig.sortgroupChr=defaultTcConfig.sortgroupChr : tcConfig.sortgroupChr=settingsDialog.TCS_sortgroupChr.value;
+  settingsDialog.TCS_wildcardChr.value==="" ? tcConfig.wildcardChr=defaultTcConfig.wildcardChr : tcConfig.wildcardChr=settingsDialog.TCS_wildcardChr.value;
   settingsDialog.TCS_runOnEvent.checked ? tcConfig.runOnEvent="input" : tcConfig.runOnEvent="keyup";
   settingsDialog.TCS_cssAliasesEnabled.checked ? tcConfig.cssAliasesEnabled=true : tcConfig.cssAliasesEnabled=false;
   tcConfig.savedAliases = settingsDialog.TCS_savedAliases.value;
   GM_setValue("tcConfig", tcConfig);
   RefreshConfig();
-  console.log("saved settings");
 }
 
 function SetKeybind(){
@@ -306,7 +302,6 @@ function SetKeybind(){
     else {settingsDialog.TCS_keybind.innerText = event.key;}
     settingsDialog.TCS_keybind.blur();
   }, {once: true});
-  console.log("set keybind");
 }
 
 tcConfig = GM_getValue("tcConfig", null);
@@ -315,13 +310,17 @@ RefreshConfig();
 
 GM_addStyle(`@keyframes tagFieldAdded {from {opacity: 0.99} to {opacity: 1}} [data-autocomplete^='tag'] {animation: tagFieldAdded 0.001s}
 .TCS_dialog {
+box-sizing: border-box;
 display: none;
+grid-template: "sidebar_a TCS_savedAliases" min-content "sidebar_b TCS_savedAliases" auto;
+grid-template-columns: min-content auto;
+column-gap: .5rem;
 position: fixed;
 z-index: 250;
 inset:0;
 margin: auto;
 width: 95vw;
-max-width: 50rem;
+max-width: 60rem;
 height: 95vh;
 padding: .5rem;
 background: var(--color-section, cornflowerblue);
@@ -329,17 +328,15 @@ color: var(--color-text, white);
 border: 1px solid var(--color-section-darken-5, black);
 border-radius: .25rem;
 box-shadow: 0 0 .5rem -1px var(--color-background, black);
-gap: .75rem;
-.sidebar {
-overflow: auto;
-display: flex;
-flex-direction: column;
-border-radius: .25rem;
-background: var(--color-section-lighten-5, steelblue);
+
+.sidebar_a {
+grid-area: sidebar_a;
+border-radius: .25rem .25rem 0 0;
 padding: .5rem;
-.sidebar_top {
+background: var(--color-section-lighten-5, steelblue);
 display: grid;
-grid: auto / min-content 6rem;
+grid: min-content / min-content 6rem;
+grid-auto-rows: min-content;
 gap: .5rem .5rem;
 input {max-width: 3rem}
 #TCS_sortChr, #TCS_sortgroupChr {max-width: unset}
@@ -350,34 +347,53 @@ label[for="TCS_runOnEvent"] {text-decoration: underline dotted 1px}
 .waiting {background-color: var(--palette-background-gold, orange)}
 .twoColumns {grid-column: 1 / span 2}
 }
-.sidebar_bottom {
-flex-grow: 1;
-display: grid;
-grid-template: "reset reset" min-content "text text" auto "save close" min-content;
-grid-template-columns: auto min-content;
-column-gap: .25rem;
-#TCS_reset {grid-area: reset; width: 100%; margin: 3vh 0}
-.text {grid-area: text}
-button:not(#TCS_reset) {border-radius: .25rem; padding: .2rem .6rem; font-size: 130%}
-#TCS_save {grid-area: save}
-#TCS_close {grid-area: close}
+
+.sidebar_b {
+grid-area: sidebar_b;
+border-radius: 0 0 .25rem .25rem;
+padding: .5rem  .5rem 0;
+overflow: auto;
+background: var(--color-section-lighten-5, steelblue);
+display: flex;
+flex-direction: column;
+#TCS_reset {width: 100%; margin: 3vh 0}
+.text {flex: 1}
+.buttons {display: flex; gap: .25rem; position: sticky; bottom: 0; background: var(--color-section-lighten-5, steelblue); padding-bottom: .5rem;
+#TCS_save, #TCS_close {border-radius: .25rem; padding: .2rem .6rem; font-size: 130%}
+#TCS_save {flex: 1}
 }
 }
-#TCS_savedAliases {border-radius: .25rem; flex: 1; resize: none; padding: 2px .5rem}
+
+#TCS_savedAliases {grid-area: TCS_savedAliases; border-radius: .25rem; resize: none; padding: 2px .5rem}
+
+@media (max-width: 50rem) {
+overflow: auto;
+width: 100vw;
+height: 100vh;
+font-size: 95%;
+border-radius: 0;
+grid-template: "sidebar_a sidebar_b" min-content "TCS_savedAliases TCS_savedAliases" auto;
+grid-template-columns: auto auto;
+padding: .25rem;
+gap: .25rem;
+.sidebar_a, .sidebar_b {border-radius: .25rem; padding: .5rem .25rem}
+.sidebar_a {grid: min-content / min-content 5rem; padding-top: 2rem}
+.sidebar_b {padding-bottom: 0; #TCS_reset {margin: 1.5rem 0} #TCS_save, #TCS_close {padding: .1rem .3rem; font-size: 120%}}
+#TCS_savedAliases {height: 90vh; padding: 2px .25rem}
 }
-.TCS_dialog.visible {display: flex}
+}
+.TCS_dialog.visible {display: grid}
 `);
 
 document.body.children.page.addEventListener("animationstart", RefreshTagboxElements, false); // detect CSS animation when element is added and refresh relevant elements
 
-GM_registerMenuCommand("Settings", OpenSettingsDialog)
+GM_registerMenuCommand("Settings", OpenSettingsDialog);
 
 let settingsDialog = document.body.appendChild(document.createElement("div"));
 settingsDialog.className = "TCS_dialog";
-let TCS_runOnEventTitle = "Run the script when a charecter is entered into the tag filed rather than on keybind press";
+let TCS_runOnEventTitle = "Replaces when a charecter is entered into the tag filed rather than on keybind press";
 settingsDialog.innerHTML += `
-<div class="sidebar">
-<div class="sidebar_top">
+<div class="sidebar_a">
 <label for="TCS_keybind">Keybind</label><button id="TCS_keybind"></button>
 <label for="TCS_invChr">Invert</label><input id="TCS_invChr" type="text" placeholder="${defaultTcConfig.invChr}">
 <label for="TCS_addChr">Add</label><input id="TCS_addChr" type="text" placeholder="${defaultTcConfig.addChr}">
@@ -389,11 +405,10 @@ settingsDialog.innerHTML += `
 <label for="TCS_runOnEvent" title="${TCS_runOnEventTitle}" class="twoColumns"><input id="TCS_runOnEvent" type="checkbox">Run on every input</label>
 <label for="TCS_cssAliasesEnabled" class="twoColumns"><input id="TCS_cssAliasesEnabled" type="checkbox">Load aliases from CSS</label>
 </div>
-<div class="sidebar_bottom">
+<div class="sidebar_b">
 <button id="TCS_reset">Reset settings</button>
-<div class="text"><b>*</b>Only in tag fields<br>Some links idk</div>
-<button id="TCS_save">Save</button><button id="TCS_close">Close</button>
-</div>
+<div class="text"><b>*</b>Only in tag fields<br><br><a href="https://github.com/WaydenceMullins/TagboxCommands">Github/Manual</a><br><br><a href="https://e621.net/forum_topics/62454">Forum thread</a></div>
+<div class="buttons"><button id="TCS_save">Save</button><button id="TCS_close">Close</button></div>
 </div>
 <textarea id="TCS_savedAliases"></textarea>
 `;
