@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Tagbox Commands
 // @namespace    http://tampermonkey.net/
-// @version      0.1
+// @version      0.1.1
 // @description  Alias and remove commands for e621
 // @author       Waydence
 // @icon         https://cdn.jsdelivr.net/gh/WaydenceMullins/TagboxCommands@main/icon64.png
