@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Tagbox Commands
 // @namespace    http://tampermonkey.net/
-// @version      0.1.1
+// @version      0.1.2
 // @description  Alias and remove commands for e621
 // @author       Waydence
 // @icon         https://cdn.jsdelivr.net/gh/WaydenceMullins/TagboxCommands@main/icon64.png
@@ -85,7 +85,7 @@ function RefreshConfig(){
   }
 
   if (/\*al\*[\s\S]+>[\s\S]+\*al\*/.test(decodeURI(currentSite.search))){
-    allAliasRules = allAliasRules.concat(ParseAliases(decodeURIComponent(currentSite.search).split("*al*")[1]));
+    allAliasRules = allAliasRules.concat(ParseAliases(decodeURIComponent(currentSite.search.replace(/\+/g," ")).split("*al*")[1]));
   }
 
   if (tcConfig.cssAliasesEnabled && currentCssLink){
