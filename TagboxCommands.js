@@ -85,7 +85,7 @@ function RefreshConfig(){
   }
 
   if (/\*al\*[\s\S]+>[\s\S]+\*al\*/.test(decodeURI(currentSite.search))){
-    allAliasRules = allAliasRules.concat(ParseAliases(decodeURI(currentSite.search).split("*al*")[1]));
+    allAliasRules = allAliasRules.concat(ParseAliases(decodeURIComponent(currentSite.search).split("*al*")[1]));
   }
 
   if (tcConfig.cssAliasesEnabled && currentCssLink){
