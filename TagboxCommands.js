@@ -84,7 +84,7 @@ function RefreshConfig(){
     allAliasRules = ParseAliases(tcConfig.savedAliases);
   }
 
-  if (/\*al\*[\s\S]+>[\s\S]+\*al\*/.test(decodeURI(currentSite.search))){
+  if (/^(?!.*\/posts\?).*\*al\*[\s\S]+>[\s\S]+\*al\*/.test(decodeURI(currentSite.href))){ // if current url is not post index, and has alias definition block
     allAliasRules = allAliasRules.concat(ParseAliases(decodeURIComponent(currentSite.search.replace(/\+/g," ")).split("*al*")[1]));
   }
 
@@ -113,6 +113,7 @@ function RefreshConfig(){
     }
   }
   allAliasRules.reverse();
+  console.log(allAliasRules)
 }
 
 function SliceByCaret(element){return [element.value.slice(0, element.selectionStart), element.value.slice(element.selectionStart)];} // to keep track of text cursor position
