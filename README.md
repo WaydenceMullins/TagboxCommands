@@ -109,9 +109,9 @@ Only the first \*al\* block is loaded, the rest will be ignored
 ## Search query aliases
 Can be loaded temporarily during tagging projects
 
-To pass definitions through search query, use one of the [metatags](https://e621.net/help/cheatsheet), for example:
+To pass definitions through search query, store them in [metatags](https://e621.net/help/cheatsheet) like status or rating, for example:
 
-[male/female artverified:"\*al\*alias1->tag1;alias2->tag2\*al\*"](https://e621.net/posts?tags=male%2Ffemale+artverified%3A%22*al*alias1-%3Etag1%3Balias2-%3Etag2*al*%22)
+[male/female status:"\*al\*alias1->tag1;alias2->tag2\*al\*"](https://e621.net/posts?tags=male%2Ffemale+artverified%3A%22*al*alias1-%3Etag1%3Balias2-%3Etag2*al*%22)
 
 ## [Custom CSS](https://e621.net/users/settings?tab=advanced) aliases
 Can be used to keep alias definitions synchronized between devices
