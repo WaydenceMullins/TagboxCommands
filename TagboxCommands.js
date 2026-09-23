@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Tagbox Commands
 // @namespace    http://tampermonkey.net/
-// @version      0.1.3
+// @version      0.1.4
 // @description  Alias and remove commands for e621
 // @author       Waydence
 // @icon         https://cdn.jsdelivr.net/gh/WaydenceMullins/TagboxCommands@main/icon64.png
@@ -84,7 +84,7 @@ function RefreshConfig(){
     allAliasRules = ParseAliases(tcConfig.savedAliases);
   }
 
-  if (/^(?!.*\/posts\?).*\*al\*[\s\S]+>[\s\S]+\*al\*/.test(decodeURI(currentSite.href))){ // if current url is not post index, and has alias definition block
+  if (/\*al\*[\s\S]+>[\s\S]+\*al\*/.test(decodeURI(currentSite.href))){ // if current url has alias definitions
     allAliasRules = allAliasRules.concat(ParseAliases(decodeURIComponent(currentSite.search.replace(/\+/g," ")).split("*al*")[1]));
   }
 
@@ -118,12 +118,12 @@ function RefreshConfig(){
 
 function SliceByCaret(element){return [element.value.slice(0, element.selectionStart), element.value.slice(element.selectionStart)];} // to keep track of text cursor position
 
-let currentlyPoking = false;
+document.pokingTagBox = false;
 function PokeTagBox(element){ // send events to trigger updates of tag preview and tag counter
-  if (currentlyPoking){return;}
-  currentlyPoking = true;
+  if (document.pokingTagBox){return;}
+  document.pokingTagBox = true;
   ["keyup","input"].forEach(event=>element.dispatchEvent(new Event(event)));
-  currentlyPoking = false;
+  document.pokingTagBox = false;
 }
 
 function GetCombinedTagString(){return Array.from(tagTextareas).map(tagTextarea=>tagTextarea.value).join(" ");} // splice all tag boxes together
@@ -191,6 +191,7 @@ function RemoveTags(){
 
 function ReplaceSortTags(event){
   if (event.key === tcConfig.keybind || tcConfig.runOnEvent === "input"){
+   console.log("TC");
     if (allAliasRules.length > 0){
       let tagStringHalves = SliceByCaret(this);
 
