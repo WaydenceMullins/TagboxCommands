@@ -80,7 +80,7 @@ function RefreshConfig(){
 
   allAliasRules = [];
 
-  if (/\S+ *> *\S+/.test(tcConfig.savedAliases)){
+  if (/\S+ *> *\S+/.test(tcConfig.savedAliases)){ // if script settings have definitions
     allAliasRules = ParseAliases(tcConfig.savedAliases);
   }
 
@@ -113,7 +113,6 @@ function RefreshConfig(){
     }
   }
   allAliasRules.reverse();
-  console.log(allAliasRules)
 }
 
 function SliceByCaret(element){return [element.value.slice(0, element.selectionStart), element.value.slice(element.selectionStart)];} // to keep track of text cursor position
@@ -191,7 +190,6 @@ function RemoveTags(){
 
 function ReplaceSortTags(event){
   if (event.key === tcConfig.keybind || tcConfig.runOnEvent === "input"){
-   console.log("TC");
     if (allAliasRules.length > 0){
       let tagStringHalves = SliceByCaret(this);
 
@@ -248,9 +246,11 @@ const RefreshTagboxElements = function(event){
 
     // all fields with autocomplete get processed for sort, replace, and remove on keybind
     document.querySelectorAll("[data-autocomplete^='tag']").forEach(field=>{
+     if (!/\*al\*[\s\S]+>[\s\S]+\*al\*/.test(field.value)){ // don't process fields that load with alias definitions
       field.removeEventListener("keyup", ReplaceSortTags);
       field.removeEventListener("input", ReplaceSortTags);
       field.addEventListener(tcConfig.runOnEvent, ReplaceSortTags);
+     }
     });
 
     // additionally, remove is processed when autocomplete is clicked, as well as on autocomplete keys (tab/enter)
