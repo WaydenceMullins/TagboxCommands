@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Tagbox Commands
 // @namespace    http://tampermonkey.net/
-// @version      0.1.4
+// @version      0.1.5
 // @description  Alias and remove commands for e621
 // @author       Waydence
 // @icon         https://cdn.jsdelivr.net/gh/WaydenceMullins/TagboxCommands@main/icon64.png
@@ -12,6 +12,7 @@
 // @grant        GM_getValue
 // @grant        GM_setValue
 // @grant        GM_registerMenuCommand
+// @tag          e6
 // ==/UserScript==
 
 let tagTextareas;
@@ -204,12 +205,12 @@ function ReplaceSortTags(event){
 
             let match = parameteres[parameteres.length - 1]; // last parameter is an object with capture group names as keys and matches as values
 
-            match.tag = match.tag.replace(new RegExp(`^(${antcdJoined})$`, "g"), rule.consq); // perform substitution
+            match.tag = match.tag.replace(new RegExp(`${antcdJoined}`, "g"), rule.consq); // perform substitution
 
             // execute a command if it is found
-            if (match.inv){ match.tag = match.tag.replace(re_invRmChr, fn_invRmChr); }
-            if (match.add){ match.tag = match.tag.replace(re_findRmChr, ""); }
-            if (match.rm){ match.tag = match.tag.replace(re_findNoRmChr, tcConfig.rmChr); }
+            if (match.inv) match.tag = match.tag.replace(re_invRmChr, fn_invRmChr);
+            if (match.add) match.tag = match.tag.replace(re_findRmChr, "");
+            if (match.rm) match.tag = match.tag.replace(re_findNoRmChr, tcConfig.rmChr);
 
             return match.tag;
           });
