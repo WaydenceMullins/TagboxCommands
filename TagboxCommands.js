@@ -205,7 +205,9 @@ function ReplaceSortTags(event){
 
             let match = parameteres[parameteres.length - 1]; // last parameter is an object with capture group names as keys and matches as values
 
-            match.tag = match.tag.replace(new RegExp(`${antcdJoined}`, "g"), rule.consq); // perform substitution
+            rule.antcd.forEach(rAntcd=>{
+             match.tag = match.tag.replace(new RegExp(`${rAntcd}`, "g"), rule.consq); // perform substitution
+            });
 
             // execute a command if it is found
             if (match.inv) match.tag = match.tag.replace(re_invRmChr, fn_invRmChr);
